@@ -7,6 +7,7 @@
 #   - Instantiate the active HeadTracker implementation (config-driven)
 #   - Instantiate the active VideoSource implementation (config-driven)
 #   - Instantiate ControlOutput and InputHandler
+#   - Instantiate TelemetryInput and spawn TelemetryPanel nodes
 #   - Push the current video texture to the hemisphere material each frame
 #   - Enforce fullscreen on Linux production targets
 
@@ -17,10 +18,11 @@ extends Node3D
 @onready var _camera: Camera3D           = $SphericalCamera
 
 # ── Runtime objects (created in _ready) ───────────────────────────────────────
-var _head_tracker:   HeadTracker
-var _video_source:   VideoSource
-var _control_output: ControlOutput
-var _input_handler:  InputHandler
+var _head_tracker:    HeadTracker
+var _video_source:    VideoSource
+var _control_output:  ControlOutput
+var _input_handler:   InputHandler
+var _telemetry_input: TelemetryInput
 
 # ── Hemisphere geometry constants ─────────────────────────────────────────────
 const HEMISPHERE_RADIUS := 50.0
@@ -36,6 +38,7 @@ func _ready() -> void:
 	_wire_head_tracker()
 	_wire_video_source()
 	_wire_control_output()
+	_wire_telemetry()
 	_configure_display()
 
 
@@ -84,6 +87,32 @@ func _wire_control_output() -> void:
 	add_child(_input_handler)
 
 
+func _wire_telemetry() -> void:
+	_telemetry_input = TelemetryInput.new()
+	add_child(_telemetry_input)
+
+	# Default panel layout — azimuth/elevation in degrees, panels on the right.
+	# Positions are intentionally kept in code rather than a resource file until
+	# an editor workflow exists; they are easy to tune here.
+	var panels := [
+		{ "signal": "battery_voltage_changed", "prefix": "Bat:  ", "az":  42.0, "el":  30.0 },
+		{ "signal": "speed_changed",           "prefix": "Spd:  ", "az":  42.0, "el":  10.0 },
+		{ "signal": "signal_rssi_changed",     "prefix": "RSSI: ", "az":  42.0, "el": -10.0 },
+		{ "signal": "gps_position_changed",    "prefix": "GPS:  ", "az":  42.0, "el": -30.0 },
+	]
+
+	for cfg in panels:
+		var panel := TelemetryPanel.new()
+		add_child(panel)
+		panel.setup(
+			_telemetry_input,
+			cfg["signal"] as String,
+			cfg["prefix"]  as String,
+			cfg["az"]      as float,
+			cfg["el"]      as float
+		)
+
+
 func _configure_display() -> void:
 	# Run fullscreen on the XREAL display (Orange Pi / Linux production).
 	if OS.has_feature("linux") and not OS.has_feature("editor"):
@@ -110,6 +139,6 @@ func _create_video_source() -> VideoSource:
 	) as String
 	match mode:
 		"rtsp_gstreamer":
-			return RTSPGStreamerSource.new()  # implemented in issue #7
+			return RTSPGStreamerSource.new()
 		_:
 			return LocalFileSource.new()

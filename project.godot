@@ -43,6 +43,13 @@ vehicle_host="192.168.1.100"
 vehicle_port=9000
 keepalive_interval_sec=0.5
 
+video/sidecar_port=9001
+video/sidecar_python="python3"
+
+[telemetry]
+
+port=9002
+
 [input_map]
 
 throttle_axis=1
