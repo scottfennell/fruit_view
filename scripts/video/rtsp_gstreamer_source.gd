@@ -92,14 +92,28 @@ func is_playing() -> bool:
 # ── Private: sidecar process ──────────────────────────────────────────────────
 
 func _spawn_sidecar() -> void:
-	var script := ProjectSettings.globalize_path("res://sidecar/video_sidecar.py")
+	var script := _resolve_sidecar_path()
 	var args   := [script, "--port", str(_port), "--url", _rtsp_url]
 	_sidecar_pid = OS.create_process(_python, args)
 	if _sidecar_pid < 0:
 		push_error("RTSPGStreamerSource: failed to spawn sidecar. " +
-				   "Ensure '%s' is installed and sidecar/video_sidecar.py exists." % _python)
+				   "Ensure '%s' is installed and video_sidecar.py is at: %s" % [_python, script])
 	else:
-		print("RTSPGStreamerSource: sidecar PID %d (port %d)" % [_sidecar_pid, _port])
+		print("RTSPGStreamerSource: sidecar PID %d, port %d, script: %s" \
+			  % [_sidecar_pid, _port, script])
+
+
+# Returns the filesystem path to video_sidecar.py.
+#
+# In the editor res:// maps to the project directory, so globalize_path works.
+# In an exported binary the PCK is embedded inside the executable; res:// files
+# are not accessible as real filesystem paths. The deploy script places
+# video_sidecar.py alongside the binary, so we resolve relative to the
+# executable in production.
+func _resolve_sidecar_path() -> String:
+	if OS.has_feature("editor"):
+		return ProjectSettings.globalize_path("res://sidecar/video_sidecar.py")
+	return OS.get_executable_path().get_base_dir().path_join("video_sidecar.py")
 
 
 # ── Private: connection management ────────────────────────────────────────────

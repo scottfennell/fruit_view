@@ -36,15 +36,14 @@ opentrack_port=4242
 source="local_file"
 local_file_path=""
 rtsp_url="rtsp://192.168.1.100:8554/stream"
+sidecar_port=9001
+sidecar_python="python3"
 
 [control]
 
 vehicle_host="192.168.1.100"
 vehicle_port=9000
 keepalive_interval_sec=0.5
-
-video/sidecar_port=9001
-video/sidecar_python="python3"
 
 [telemetry]
 
