@@ -141,19 +141,21 @@ When `video_texture` is the default white (`r+g+b >= 2.99`), the shader draws a 
 | XRLinuxDriver systemd service | Done |
 | GStreamer on Orange Pi | Done — `gstreamer1.0-libav` installed; pipeline verified |
 | GUT test framework | Done — v9.6.0, 47/47 tests passing |
-| End-to-end FPV session (#9) | Needs glasses + camera physically connected |
+| Full hardware stack verified (#6) | Done — fullscreen on XREAL, head tracking live, video on hemisphere confirmed 2026-05-24 |
+| End-to-end FPV session (#9) | Needs RC vehicle + Pi camera physically connected |
 | OpenXR tracker (Meta Quest) | Parked — future work |
 
-### Remaining hardware-only steps (issues #6, #9)
+### Remaining hardware-only steps (issue #9)
 
-All software is deployed and verified headless. The remaining work requires physical access:
+Issue #6 is fully closed. The remaining work requires RC vehicle + camera:
 
-1. Connect XREAL Air 2 Pro to the Pi via USB-C
-2. Verify `check_opentrack.py` shows live yaw/pitch while wearing the glasses
-3. Run `launch.sh` and confirm fullscreen on the XREAL display
-4. Connect RC vehicle / Pi camera and verify live RTSP stream + telemetry
+1. Connect Pi camera to RC vehicle
+2. Start RTSP stream from camera
+3. Run `launch.sh` and verify live RTSP feed on hemisphere with head tracking
 
-XRLinuxDriver is **running** (PID stable since boot) but the glasses were not connected during last SSH session. The systemd service shows restart-loop errors only because the already-running daemon prevents a second instance — the first instance is fine.
+**ARM64 rendering note**: Vulkan is unavailable on RK3588 via X11 (VK_KHR_surface missing). Godot falls back to OpenGL 3 automatically. libGL rockchip/rknpu DRI errors appear in the log but rendering works correctly.
+
+**XRLinuxDriver**: Systemd service shows restart-loop errors only because the already-running daemon (PID stable since boot) prevents a second instance — the first instance is fine. OpenTrack UDP target is `127.0.0.1:4242`.
 
 ---
 
