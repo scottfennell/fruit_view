@@ -6,6 +6,9 @@
 # Head yaw and pitch are included in every packet so the vehicle Pi can relay
 # them to a gimbal without any additional glue code.
 #
+# Recenter: press Space (keyboard) or the gamepad Back/Select button to capture
+# the current head pose as the new forward direction.
+#
 # Configuration (project.godot):
 #   input_map/throttle_axis — JoyAxis index for throttle (default JOY_AXIS_LEFT_Y = 1)
 #   input_map/steering_axis — JoyAxis index for steering (default JOY_AXIS_LEFT_X = 0)
@@ -18,6 +21,10 @@ const SETTING_STEERING_AXIS := "input_map/steering_axis"
 const DEFAULT_THROTTLE_AXIS := JOY_AXIS_LEFT_Y  # 1
 const DEFAULT_STEERING_AXIS := JOY_AXIS_LEFT_X  # 0
 const DEADZONE              := 0.05
+
+# Recenter bindings (not configurable at runtime — change here if needed).
+const RECENTER_KEY    := KEY_SPACE
+const RECENTER_BUTTON := JOY_BUTTON_BACK  # gamepad Select / Back / Share
 
 var control_output: ControlOutput
 var head_tracker:   HeadTracker
@@ -33,6 +40,17 @@ func _ready() -> void:
 	_steering_axis = ProjectSettings.get_setting(
 		SETTING_STEERING_AXIS, DEFAULT_STEERING_AXIS
 	) as int
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if key.pressed and not key.echo and key.keycode == RECENTER_KEY:
+			_recenter()
+	elif event is InputEventJoypadButton:
+		var btn := event as InputEventJoypadButton
+		if btn.pressed and btn.button_index == RECENTER_BUTTON:
+			_recenter()
 
 
 func _process(_delta: float) -> void:
@@ -54,3 +72,8 @@ func _process(_delta: float) -> void:
 		head_pitch = rot.x
 
 	control_output.send(throttle, steering, head_yaw, head_pitch)
+
+
+func _recenter() -> void:
+	if head_tracker != null:
+		head_tracker.recenter()

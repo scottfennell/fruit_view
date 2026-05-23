@@ -46,3 +46,9 @@ func _input(event: InputEvent) -> void:
 
 func get_rotation() -> Vector3:
 	return Vector3(_pitch, _yaw, 0.0)
+
+
+# Reset accumulated pose to zero (look straight ahead).
+func recenter() -> void:
+	_yaw   = 0.0
+	_pitch = 0.0

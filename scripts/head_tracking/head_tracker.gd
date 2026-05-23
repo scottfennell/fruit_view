@@ -19,3 +19,9 @@ extends Node
 #   roll  (z): rotation around Z axis — unused initially, always 0
 func get_rotation() -> Vector3:
 	return Vector3.ZERO
+
+
+# Capture the current pose as the new zero/forward direction.
+# Subclasses that support recentering should override this.
+func recenter() -> void:
+	pass

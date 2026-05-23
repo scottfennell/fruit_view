@@ -52,7 +52,9 @@ func _process(_delta: float) -> void:
 	# Apply head tracking to camera each frame.
 	if _head_tracker != null:
 		var rot := _head_tracker.get_rotation()
-		_camera.rotation = Vector3(rot.x, rot.y, 0.0)
+		# OpenTrack pitch is positive-up; Godot Camera3D rotation.x is positive-down.
+		# Negate pitch so looking down tilts the camera down, not up.
+		_camera.rotation = Vector3(-rot.x, rot.y, 0.0)
 
 
 # ── Private builders ──────────────────────────────────────────────────────────

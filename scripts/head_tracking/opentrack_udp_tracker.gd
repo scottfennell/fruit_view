@@ -15,22 +15,37 @@
 #
 # Configuration (project.godot):
 #   head_tracker/opentrack_port — local UDP port to bind (default 4242)
+#   head_tracker/sensitivity    — rotation multiplier, >1 faster, <1 slower (default 1.0)
+#
+# Recenter: call recenter() (or press Space / gamepad Back via InputHandler) to
+# capture the current pose as the new forward direction.
 
 class_name OpenTrackUDPTracker
 extends HeadTracker
 
 const PAYLOAD_SIZE := 48  # 6 × 8 bytes (float64)
-const SETTING_PORT := "head_tracker/opentrack_port"
-const DEFAULT_PORT := 4242
+const SETTING_PORT        := "head_tracker/opentrack_port"
+const SETTING_SENSITIVITY := "head_tracker/sensitivity"
+const DEFAULT_PORT        := 4242
+const DEFAULT_SENSITIVITY := 1.0
 
 var _socket: PacketPeerUDP = PacketPeerUDP.new()
 var _yaw:    float = 0.0
 var _pitch:  float = 0.0
 
+# Offset captured by recenter() — subtracted from raw angles each frame.
+var _yaw_offset:   float = 0.0
+var _pitch_offset: float = 0.0
+
+var _sensitivity: float = 1.0
+
 
 func _ready() -> void:
 	var port := ProjectSettings.get_setting(SETTING_PORT, DEFAULT_PORT) as int
-	var err   := _socket.bind(port)
+	_sensitivity = ProjectSettings.get_setting(
+		SETTING_SENSITIVITY, DEFAULT_SENSITIVITY
+	) as float
+	var err := _socket.bind(port)
 	if err != OK:
 		push_error(
 			"OpenTrackUDPTracker: failed to bind UDP port %d (error %d). " % [port, err] +
@@ -56,7 +71,20 @@ func _parse_packet(data: PackedByteArray) -> void:
 
 
 func get_rotation() -> Vector3:
-	return Vector3(_pitch, _yaw, 0.0)
+	# Subtract offset (set by recenter()), then scale by sensitivity.
+	var yaw   := (_yaw   - _yaw_offset)   * _sensitivity
+	var pitch := (_pitch - _pitch_offset) * _sensitivity
+	return Vector3(pitch, yaw, 0.0)
+
+
+# Capture the current pose as the new zero/forward direction.
+# The next get_rotation() call will return Vector3.ZERO for the current pose.
+func recenter() -> void:
+	_yaw_offset   = _yaw
+	_pitch_offset = _pitch
+	print("OpenTrackUDPTracker: recentered (yaw=%.1f° pitch=%.1f°)" % [
+		rad_to_deg(_yaw), rad_to_deg(_pitch)
+	])
 
 
 func _notification(what: int) -> void:

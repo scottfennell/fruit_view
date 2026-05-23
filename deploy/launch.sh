@@ -31,4 +31,4 @@ if ! ss -ulnp 2>/dev/null | grep -q ":4242 "; then
 fi
 
 echo "Launching fruit_view on screen $SCREEN..."
-exec "$BINARY" --screen "$SCREEN"
+exec "$BINARY" --fullscreen --screen "$SCREEN"

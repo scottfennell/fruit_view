@@ -3,16 +3,26 @@
 ; since the parameters that go here are not all obvious.
 ;
 ; Format:
-;   [section] ; section goes in [] on its own line
-;   param=value ; each parameter goes on its own line
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="fruit_view"
-config/features=PackedStringArray("4.3", "Forward Plus")
-config/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[control]
+
+vehicle_host="192.168.1.100"
+vehicle_port=9000
+keepalive_interval_sec=0.5
 
 [display]
 
@@ -20,16 +30,25 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
 
-[rendering]
-
-renderer/rendering_method="forward_plus"
-environment/defaults/default_clear_color=Color(0, 0, 0, 1)
-
 [head_tracker]
 
 mode="mouse_look"
 mouse_sensitivity=0.1
 opentrack_port=4242
+sensitivity=1.0
+
+[input_map]
+
+throttle_axis=1
+steering_axis=0
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0, 0, 0, 1)
+
+[telemetry]
+
+port=9002
 
 [video]
 
@@ -38,18 +57,3 @@ local_file_path=""
 rtsp_url="rtsp://192.168.1.100:8554/stream"
 sidecar_port=9001
 sidecar_python="python3"
-
-[control]
-
-vehicle_host="192.168.1.100"
-vehicle_port=9000
-keepalive_interval_sec=0.5
-
-[telemetry]
-
-port=9002
-
-[input_map]
-
-throttle_axis=1
-steering_axis=0

@@ -20,7 +20,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PI_HOST="${PI_HOST:-orangepi.local}"
+PI_HOST="${PI_HOST:-192.168.86.22}"
 PI_USER="${PI_USER:-orangepi}"
 PI_DIR="${PI_DIR:-fruit_view}"
 REMOTE="${PI_USER}@${PI_HOST}"
