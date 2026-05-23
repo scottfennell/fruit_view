@@ -51,8 +51,9 @@ A Godot 4 application that renders the RC vehicle's wide-angle camera feed onto 
 
 ### Video Pipeline (`VideoSource`)
 - Abstract base class exposing `get_texture() → Texture2D`, updated each frame.
-- `RTSPGStreamerSource`: spawns an external GStreamer process (`gst-launch-1.0`) with an RTSP source pipeline. Decoded raw frames are written to a Unix domain socket. A background thread in Godot reads frames from the socket and uploads them to an `ImageTexture`. RTSP URL is configurable.
-- `LocalFileSource`: wraps Godot's built-in `VideoStreamPlayer`. Used for development and offline testing. File path is configurable.
+- `RTSPGStreamerSource`: spawns `video_sidecar.py` as a subprocess. The sidecar runs a GStreamer pipeline (`rtspsrc → rtph264depay → avdec_h264 → videoconvert → RGBA appsink`) and streams decoded RGBA frames over a local TCP connection (default port 9001). Each frame is prefixed with a width/height header (2 × u32 little-endian). Godot connects as a TCP client and reassembles frames into an `ImageTexture`. RTSP URL and port are configurable. The sidecar also supports a `--file` mode (`filesrc ! decodebin`) for offline testing with any GStreamer-decodable file format (MP4/H.264 confirmed).
+- **Required camera format**: H.264 video delivered via RTSP (`rtsp://` URL). H.265, MJPEG, and VP8/VP9 are not supported without modifying the sidecar pipeline.
+- `LocalFileSource`: wraps Godot's built-in `VideoStreamPlayer`. Supports `.ogv` (Ogg Theora) only — other formats require a GDExtension. Used for in-editor development only; `RTSPGStreamerSource` in `--file` mode is preferred for offline testing on the Pi.
 - Active implementation selected via a project setting.
 
 ### Hemisphere Geometry (`HemisphereMesh`)
@@ -114,7 +115,7 @@ Tests should validate observable external behaviour only — inputs in, outputs 
 - `OpenXRTracker`: mock `XRServer` pose; assert `get_rotation()` returns the transformed value.
 
 **`VideoSource`**
-- `RTSPGStreamerSource`: mock the Unix socket with a pre-recorded frame sequence; assert `get_texture()` returns an updated `ImageTexture` with the correct dimensions and pixel data.
+- `RTSPGStreamerSource`: call `_handle_complete_frame(width, height, rgba_data)` directly with a synthetic frame; assert `get_texture()` returns an `ImageTexture` with the correct dimensions and pixel data. Test status text transitions (`Connecting…` → playing → `No signal`). Test that a dropped TCP connection triggers the reconnect timer.
 - `LocalFileSource`: load a known test `.ogv` file; assert `get_texture()` is non-null after playback begins.
 
 **`TelemetryInput`**

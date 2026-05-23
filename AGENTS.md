@@ -120,6 +120,18 @@ When `video_texture` is the default white (`r+g+b >= 2.99`), the shader draws a 
 
 **OpenTrack packet format**: 6×`float64` LE, 48 bytes total. Yaw at offset 24, pitch at offset 32 (degrees).
 
+**Video format requirements** (`sidecar/video_sidecar.py`):
+The GStreamer sidecar pipeline is fixed as:
+```
+rtspsrc location="<URL>" latency=0 protocols=tcp
+  ! rtph264depay ! avdec_h264 ! videoconvert ! video/x-raw,format=RGBA ! appsink
+```
+- **Required codec**: H.264 (AVC). H.265, MJPEG, VP8/VP9 are not supported without modifying the pipeline.
+- **Transport**: RTP over RTSP (`rtsp://` URL). TCP transport forced (`protocols=tcp`).
+- **Resolution / frame rate**: any — the sidecar writes width/height into each frame header; Godot resizes `ImageTexture` on resolution change.
+- **File mode** (`--file`): uses `filesrc ! decodebin`, so any GStreamer-decodable format works (MP4/H.264 confirmed on Orange Pi with `gstreamer1.0-libav` installed).
+- `LocalFileSource` (in-editor only): Godot's `VideoStreamPlayer` supports `.ogv` (Ogg Theora) only.
+
 ---
 
 ## Current status

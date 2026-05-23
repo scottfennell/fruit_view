@@ -194,15 +194,56 @@ are needed to switch between Mac dev mode and Orange Pi production.
 ## Video pipeline
 
 ```
-Raspberry Pi camera
-  → GStreamer (rtspsrc + decode + appsink)
-  → video_sidecar.py  (TCP server on port 9001)
-  → RTSPGStreamerSource  (TCP client; assembles RGBA frames)
-  → ImageTexture on hemisphere shader
+RC vehicle Pi camera
+  → GStreamer RTSP server (H.264, RTP/RTSP)
+  → video_sidecar.py  [rtspsrc ! rtph264depay ! avdec_h264 ! videoconvert ! RGBA appsink]
+  → TCP localhost:9001  (raw RGBA frames: 4-byte width, 4-byte height, width×height×4 pixels)
+  → RTSPGStreamerSource  (TCP client; assembles frames into ImageTexture)
+  → hemisphere.gdshader  (unlit, equirectangular UV)
 ```
 
 `video_sidecar.py` is deployed alongside the binary as a separate file (not embedded
 in the PCK) so Python can execute it directly.
+
+### Required camera video format
+
+The GStreamer sidecar expects the RTSP stream to contain **H.264 video**.
+The pipeline is fixed as: `rtspsrc → rtph264depay → avdec_h264 → videoconvert → RGBA`.
+
+| Property | Requirement |
+|---|---|
+| Codec | H.264 (AVC) |
+| Container / transport | RTP over RTSP (`rtsp://` URL) |
+| Resolution | Any — sidecar sends width/height per frame; Godot resizes texture dynamically |
+| Frame rate | Any — sidecar drops frames when Godot is behind (`max-buffers=1 drop=true`) |
+| Profile | Baseline, Main, or High |
+| Colour space | Any — `videoconvert` normalises to RGBA before sending |
+
+H.265 (HEVC), MJPEG, and VP8/VP9 are **not** supported by the current pipeline.
+To add support, replace `rtph264depay ! avdec_h264` in `sidecar/video_sidecar.py`.
+
+**Ideal camera setup** (Raspberry Pi + `gst-rtsp-server`):
+
+```bash
+gst-launch-1.0 rpicamsrc ! video/x-h264,width=1920,height=1080 \
+  ! rtph264pay name=pay0 pt=96 \
+  ! udpsink host=0.0.0.0 port=8554
+```
+
+Or via `libcamera-vid` piped into a GStreamer RTSP server — any setup that produces
+an `rtsp://` URL serving H.264 works.
+
+### Testing without a camera (file mode)
+
+The sidecar also accepts a local video file:
+
+```bash
+python3 ~/fruit_view/video_sidecar.py --port 9001 --file /path/to/test.mp4
+```
+
+In file mode the pipeline is `filesrc ! decodebin`, so any format GStreamer can decode
+(MP4/H.264, MKV, etc.) works. The Godot app reconnects automatically when it detects
+the sidecar is listening on port 9001.
 
 ---
 
@@ -216,14 +257,16 @@ in the PCK) so Python can execute it directly.
 | OpenTrack UDP head tracker (Pi) | Done |
 | Head tracking recenter (Space / gamepad Back) | Done |
 | Head tracking sensitivity multiplier | Done |
-| Local file video source | Done |
-| RTSP/GStreamer video source | Done (blocked by GStreamer package state on Pi) |
+| Local file video source (.ogv via VideoStreamPlayer) | Done |
+| RTSP/GStreamer video source (H.264 over RTSP) | Done |
+| GStreamer sidecar file mode (any format via decodebin) | Done |
 | UDP control output + gamepad input | Done |
 | Telemetry input + HUD panels | Done |
+| Status overlay (Connecting… / No signal) | Done |
 | Linux ARM64 export + deploy toolchain | Done |
 | XRLinuxDriver auto-start (systemd) | Done |
-| GStreamer packages on Orange Pi | Needs investigation |
-| End-to-end FPV session (issue #9) | Blocked on GStreamer |
+| Full hardware stack on Pi + XREAL Air 2 Pro | Done — verified 2026-05-24 |
+| End-to-end FPV session (issue #9) | Needs RC vehicle + Pi camera connected |
 | OpenXR tracker for Meta Quest | Parked (future) |
 
 ---
@@ -234,5 +277,5 @@ Unit tests use the [GUT](https://github.com/bitwes/Gut) framework. See [tests/RE
 
 ```bash
 # Headless test run (from repo root):
-godot4 --headless --path . -s addons/gut/gut_cmdln.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit/ -gexit
 ```
