@@ -97,10 +97,11 @@ func test_two_packets_emit_signals_twice() -> void:
 
 
 func test_short_packet_emits_no_signals() -> void:
-	# _parse_and_emit is only called after a size guard in _process,
-	# but verify it does not crash with a short payload if called directly.
+	# _parse_and_emit has a size guard that silently discards truncated packets.
+	# Verify that calling it directly with a short payload emits no signals.
 	var short := PackedByteArray()
 	short.resize(10)
-	# The size guard in _process prevents this in production;
-	# here we just assert nothing crashes.
-	assert_true(true, "Short packet path should not crash")
+	_input._parse_and_emit(short)
+	for signal_name in _signal_counts:
+		assert_eq(_signal_counts[signal_name], 0,
+			"Signal '%s' must not be emitted for a truncated packet" % signal_name)

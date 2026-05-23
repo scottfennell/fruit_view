@@ -35,6 +35,9 @@ const HEADER_SIZE        := 8    # width(u32) + height(u32)
 var _peer:             StreamPeerTCP  = StreamPeerTCP.new()
 var _connected:        bool           = false
 var _reconnect_timer:  float          = RECONNECT_INTERVAL  # attempt immediately
+# True once we have had at least one successful frame — used to distinguish
+# "Connecting…" (never connected) from "No signal" (lost a live stream).
+var _ever_connected:   bool           = false
 
 # ── Receive buffer ────────────────────────────────────────────────────────────
 # All bytes received from the sidecar accumulate here; complete frames are
@@ -42,7 +45,10 @@ var _reconnect_timer:  float          = RECONNECT_INTERVAL  # attempt immediatel
 var _recv: PackedByteArray = PackedByteArray()
 
 # ── Output texture ────────────────────────────────────────────────────────────
-var _texture:   ImageTexture = ImageTexture.new()
+# Null until the first frame arrives. Use create_from_image() on first frame,
+# then update() on subsequent frames (update() requires an already-initialised
+# texture with matching dimensions).
+var _texture:   ImageTexture = null
 var _has_frame: bool         = false
 
 # ── Sidecar process ───────────────────────────────────────────────────────────
@@ -87,6 +93,16 @@ func get_texture() -> Texture2D:
 
 func is_playing() -> bool:
 	return _connected and _has_frame
+
+
+# Returns a status string for the overlay when not playing.
+# "Connecting…"  — sidecar is starting up or has never delivered a frame.
+# "No signal"    — stream was live but has since dropped.
+# ""             — playing normally; overlay should be hidden.
+func get_status_text() -> String:
+	if is_playing():
+		return ""
+	return "No signal" if _ever_connected else "Connecting\u2026"
 
 
 # ── Private: sidecar process ──────────────────────────────────────────────────
@@ -159,8 +175,15 @@ func _handle_complete_frame(width: int, height: int, rgba_data: PackedByteArray)
 	var img := Image.create_from_data(
 		width, height, false, Image.FORMAT_RGBA8, rgba_data
 	)
-	_texture.update(img)
-	_has_frame = true
+	if _texture == null or _texture.get_width() != width or _texture.get_height() != height:
+		# First frame or resolution change — create a new ImageTexture.
+		# ImageTexture.update() requires an already-initialised texture with
+		# matching dimensions, so we use create_from_image() here.
+		_texture = ImageTexture.create_from_image(img)
+	else:
+		_texture.update(img)
+	_has_frame      = true
+	_ever_connected = true
 
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────

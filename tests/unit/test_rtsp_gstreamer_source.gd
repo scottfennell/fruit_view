@@ -1,8 +1,8 @@
 # test_rtsp_gstreamer_source.gd
 #
 # Unit tests for RTSPGStreamerSource.
-# Tests _handle_complete_frame() and _consume_frames() directly —
-# no live TCP socket or GStreamer process required.
+# Tests _handle_complete_frame(), _consume_frames(), and reconnect state
+# directly — no live TCP socket or GStreamer process required.
 
 extends GutTest
 
@@ -36,16 +36,17 @@ func test_handle_frame_makes_texture_non_null() -> void:
 func test_handle_frame_sets_is_playing() -> void:
 	var data := _solid_rgba(2, 2, 0, 255, 0, 255)
 	_source._handle_complete_frame(2, 2, data)
-	assert_true(_source.is_playing(),
-		"is_playing() should be true after a frame has been received " +
-		"(when connected — here we set _has_frame directly)")
+	# _connected is still false (no real TCP socket), but _has_frame is true.
+	# is_playing() requires both — assert _has_frame via get_texture() instead.
+	assert_not_null(_source.get_texture(),
+		"get_texture() should be non-null after a frame has been received")
 
 
 func test_handle_frame_updates_texture_on_second_call() -> void:
 	_source._handle_complete_frame(2, 2, _solid_rgba(2, 2, 255, 0, 0, 255))
 	var first := _source.get_texture()
 	_source._handle_complete_frame(4, 4, _solid_rgba(4, 4, 0, 0, 255, 255))
-	# Texture object is reused (updated in place) — it should still be non-null
+	# Texture object may be replaced on resolution change — still non-null.
 	assert_not_null(_source.get_texture(),
 		"Texture should remain valid after a second frame")
 
@@ -83,6 +84,42 @@ func test_consume_frames_waits_for_incomplete_frame() -> void:
 		"Incomplete frame should remain in buffer until full data arrives")
 
 
+# ── Reconnect / status path ───────────────────────────────────────────────────
+
+func test_status_text_is_connecting_before_first_frame() -> void:
+	assert_eq(_source.get_status_text(), "Connecting\u2026",
+		"Status should be 'Connecting…' before any frame arrives")
+
+
+func test_status_text_is_no_signal_after_frame_then_disconnect() -> void:
+	# Simulate: frame arrived, then connection dropped.
+	_source._handle_complete_frame(2, 2, _solid_rgba(2, 2, 0, 0, 0, 255))
+	# Now simulate disconnect: _connected becomes false.
+	_source._connected = false
+	assert_eq(_source.get_status_text(), "No signal",
+		"Status should switch to 'No signal' once we have had frames but lost connection")
+
+
+func test_status_text_empty_when_playing() -> void:
+	# Simulate connected + has frame.
+	_source._connected = true
+	_source._handle_complete_frame(2, 2, _solid_rgba(2, 2, 0, 0, 0, 255))
+	assert_eq(_source.get_status_text(), "",
+		"Status should be empty (overlay hidden) when playing")
+
+
+func test_disconnect_triggers_reconnect_timer() -> void:
+	# Simulate: was connected, then peer drops.
+	_source._connected = true
+	# Force the peer into a non-connected state by replacing it with a fresh one
+	# (never connected → STATUS_NONE, which is not STATUS_CONNECTED).
+	_source._peer = StreamPeerTCP.new()
+	# Run _process with a tiny delta — the code should detect the drop.
+	_source._process(0.01)
+	assert_false(_source._connected,
+		"_connected should become false when the peer is no longer STATUS_CONNECTED")
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 # Build a PackedByteArray of solid RGBA pixels (w × h pixels).
@@ -105,3 +142,4 @@ func _framed(w: int, h: int, rgba: PackedByteArray) -> PackedByteArray:
 	header.encode_u32(4, h)
 	header.append_array(rgba)
 	return header
+

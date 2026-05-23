@@ -47,7 +47,13 @@ func _process(_delta: float) -> void:
 
 # Parse a complete telemetry packet and emit signals.
 # Exposed (not prefixed __) so unit tests can inject packets directly.
+# Guards against short payloads so both _process callers and direct unit-test
+# callers are safe — decode_float/decode_double would read past the buffer end
+# and emit engine errors on truncated data.
 func _parse_and_emit(data: PackedByteArray) -> void:
+	if data.size() < PACKET_SIZE:
+		return
+
 	var battery := data.decode_float(0)
 	var speed   := data.decode_float(4)
 	var rssi    := data.decode_float(8)

@@ -18,6 +18,10 @@ config/name="fruit_view"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
 [control]
 
 vehicle_host="192.168.1.100"

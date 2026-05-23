@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TelemetryPanelLayout" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/telemetry_panel_layout.gd" id="1_layout"]
+
+[resource]
+script = ExtResource("1_layout")
+panels = [
+	{"signal": "battery_voltage_changed", "prefix": "Bat:  ", "az": 42.0, "el": 30.0},
+	{"signal": "speed_changed",           "prefix": "Spd:  ", "az": 42.0, "el": 10.0},
+	{"signal": "signal_rssi_changed",     "prefix": "RSSI: ", "az": 42.0, "el": -10.0},
+	{"signal": "gps_position_changed",    "prefix": "GPS:  ", "az": 42.0, "el": -30.0}
+]

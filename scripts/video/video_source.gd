@@ -19,3 +19,9 @@ func get_texture() -> Texture2D:
 # Returns true when the source is actively delivering frames.
 func is_playing() -> bool:
 	return false
+
+
+# Returns a human-readable status string for display when not playing.
+# Empty string means the source is playing normally and no overlay is needed.
+func get_status_text() -> String:
+	return ""

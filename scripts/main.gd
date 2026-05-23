@@ -9,6 +9,8 @@
 #   - Instantiate ControlOutput and InputHandler
 #   - Instantiate TelemetryInput and spawn TelemetryPanel nodes
 #   - Push the current video texture to the hemisphere material each frame
+#   - Display a status overlay ("Connecting…" / "No signal") when the video
+#     source is not delivering frames
 #   - Enforce fullscreen on Linux production targets
 
 extends Node3D
@@ -23,6 +25,7 @@ var _video_source:    VideoSource
 var _control_output:  ControlOutput
 var _input_handler:   InputHandler
 var _telemetry_input: TelemetryInput
+var _status_label:    Label
 
 # ── Hemisphere geometry constants ─────────────────────────────────────────────
 const HEMISPHERE_RADIUS := 50.0
@@ -39,6 +42,7 @@ func _ready() -> void:
 	_wire_video_source()
 	_wire_control_output()
 	_wire_telemetry()
+	_wire_status_overlay()
 	_configure_display()
 
 
@@ -48,6 +52,12 @@ func _process(_delta: float) -> void:
 		var tex := _video_source.get_texture()
 		if tex != null:
 			_hemisphere_mat.set_shader_parameter("video_texture", tex)
+
+		# Update status overlay.
+		if _status_label != null:
+			var status := _video_source.get_status_text()
+			_status_label.text    = status
+			_status_label.visible = status != ""
 
 	# Apply head tracking to camera each frame.
 	if _head_tracker != null:
@@ -93,17 +103,8 @@ func _wire_telemetry() -> void:
 	_telemetry_input = TelemetryInput.new()
 	add_child(_telemetry_input)
 
-	# Default panel layout — azimuth/elevation in degrees, panels on the right.
-	# Positions are intentionally kept in code rather than a resource file until
-	# an editor workflow exists; they are easy to tune here.
-	var panels := [
-		{ "signal": "battery_voltage_changed", "prefix": "Bat:  ", "az":  42.0, "el":  30.0 },
-		{ "signal": "speed_changed",           "prefix": "Spd:  ", "az":  42.0, "el":  10.0 },
-		{ "signal": "signal_rssi_changed",     "prefix": "RSSI: ", "az":  42.0, "el": -10.0 },
-		{ "signal": "gps_position_changed",    "prefix": "GPS:  ", "az":  42.0, "el": -30.0 },
-	]
-
-	for cfg in panels:
+	var layout := _load_panel_layout()
+	for cfg in layout:
 		var panel := TelemetryPanel.new()
 		add_child(panel)
 		panel.setup(
@@ -113,6 +114,47 @@ func _wire_telemetry() -> void:
 			cfg["az"]      as float,
 			cfg["el"]      as float
 		)
+
+
+# Load the telemetry panel layout.  If a custom resource exists on disk it is
+# used; otherwise the built-in defaults are returned.  The resource format is
+# an Array of Dictionaries with keys: signal, prefix, az (float), el (float).
+func _load_panel_layout() -> Array:
+	const LAYOUT_PATH := "res://data/telemetry_panel_layout.tres"
+	if ResourceLoader.exists(LAYOUT_PATH):
+		var res = load(LAYOUT_PATH)
+		if res is TelemetryPanelLayout:
+			return res.panels
+	return _default_panel_layout()
+
+
+# Built-in fallback layout used when no .tres resource file is present.
+func _default_panel_layout() -> Array:
+	return [
+		{ "signal": "battery_voltage_changed", "prefix": "Bat:  ", "az":  42.0, "el":  30.0 },
+		{ "signal": "speed_changed",           "prefix": "Spd:  ", "az":  42.0, "el":  10.0 },
+		{ "signal": "signal_rssi_changed",     "prefix": "RSSI: ", "az":  42.0, "el": -10.0 },
+		{ "signal": "gps_position_changed",    "prefix": "GPS:  ", "az":  42.0, "el": -30.0 },
+	]
+
+
+func _wire_status_overlay() -> void:
+	# A simple 2D label centred on screen.  Visible only when the video source
+	# is not delivering frames; hidden the moment live video arrives.
+	var canvas := CanvasLayer.new()
+	add_child(canvas)
+
+	_status_label = Label.new()
+	_status_label.text                   = "Connecting\u2026"
+	_status_label.horizontal_alignment   = HORIZONTAL_ALIGNMENT_CENTER
+	_status_label.vertical_alignment     = VERTICAL_ALIGNMENT_CENTER
+	_status_label.anchors_preset         = Control.PRESET_FULL_RECT
+	_status_label.add_theme_font_size_override("font_size", 48)
+	_status_label.add_theme_color_override("font_color", Color.WHITE)
+	_status_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	_status_label.add_theme_constant_override("shadow_offset_x", 2)
+	_status_label.add_theme_constant_override("shadow_offset_y", 2)
+	canvas.add_child(_status_label)
 
 
 func _configure_display() -> void:

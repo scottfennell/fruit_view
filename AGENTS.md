@@ -132,37 +132,38 @@ When `video_texture` is the default white (`r+g+b >= 2.99`), the shader draws a 
 | OpenTrack UDP tracker (Pi) | Done |
 | Recenter + sensitivity | Done |
 | Local file video source | Done |
-| RTSP/GStreamer video source | Done (Pi blocked — see below) |
+| RTSP/GStreamer video source | Done |
 | UDP control output + gamepad | Done |
 | Telemetry input + HUD | Done |
+| TelemetryPanelLayout config resource | Done |
+| Status overlay (Connecting… / No signal) | Done |
 | Linux ARM64 export + deploy | Done |
 | XRLinuxDriver systemd service | Done |
-| **GStreamer on Orange Pi** | **BLOCKED — packages in broken state** |
-| End-to-end FPV session (#9) | Blocked on GStreamer |
+| GStreamer on Orange Pi | Done — `gstreamer1.0-libav` installed; pipeline verified |
+| GUT test framework | Done — v9.6.0, 47/47 tests passing |
+| End-to-end FPV session (#9) | Needs glasses + camera physically connected |
 | OpenXR tracker (Meta Quest) | Parked — future work |
 
-### Active blocker: GStreamer on Pi
+### Remaining hardware-only steps (issues #6, #9)
 
-`setup_pi.sh` ran but package installation had errors. Before working on video, diagnose:
+All software is deployed and verified headless. The remaining work requires physical access:
 
-```bash
-ssh orangepi@192.168.86.22
-dpkg -l | grep gstreamer
-gst-inspect-1.0 rtspsrc 2>&1 | head -5
-python3 -c "import gi; gi.require_version('Gst','1.0'); from gi.repository import Gst; Gst.init(None); print(Gst.version_string())"
-```
+1. Connect XREAL Air 2 Pro to the Pi via USB-C
+2. Verify `check_opentrack.py` shows live yaw/pitch while wearing the glasses
+3. Run `launch.sh` and confirm fullscreen on the XREAL display
+4. Connect RC vehicle / Pi camera and verify live RTSP stream + telemetry
 
-Fix the package state, then test `video_sidecar.py` directly before relying on the Godot app.
+XRLinuxDriver is **running** (PID stable since boot) but the glasses were not connected during last SSH session. The systemd service shows restart-loop errors only because the already-running daemon prevents a second instance — the first instance is fine.
 
 ---
 
 ## Tests
 
-Uses the [GUT](https://github.com/bitwes/Gut) framework. Install via Godot editor AssetLib.
+Uses the [GUT](https://github.com/bitwes/Gut) framework. v9.6.0 is checked in at `addons/gut/`.
 
 ```bash
 # Headless run:
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . -s addons/gut/gut_cmdln.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit/ -gexit
 ```
 
 Test files live in `tests/unit/`.
