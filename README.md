@@ -4,7 +4,14 @@ FPV telepresence viewer for an RC vehicle. Renders a live wide-angle camera feed
 
 Built with Godot 4 / GDScript. Runs on Orange Pi (Linux ARM64) + XREAL Air 2 Pro today; designed to swap to Meta Quest (OpenXR) later with no code changes.
 
-See [PRD.md](PRD.md) for full requirements and design decisions.
+See [PRD.md](PRD.md) for the current viewer requirements and [docs/vehicle-node-prd.md](docs/vehicle-node-prd.md) for the Raspberry Pi vehicle-node image/runtime plan.
+
+Current vehicle-node work is tracked in:
+- [#10](https://github.com/scottfennell/fruit_view/issues/10) Build a personalized read-only vehicle-node image
+- [#11](https://github.com/scottfennell/fruit_view/issues/11) Add CSI camera RTSP streaming to the generated image
+- [#12](https://github.com/scottfennell/fruit_view/issues/12) Add the dry-run vehicle daemon and document the RC-channel contract
+- [#13](https://github.com/scottfennell/fruit_view/issues/13) Integrate camera and dry-run control into one appliance boot path
+- [#14](https://github.com/scottfennell/fruit_view/issues/14) Enable real tracked-drive ESC outputs
 
 ---
 
@@ -14,7 +21,7 @@ See [PRD.md](PRD.md) for full requirements and design decisions.
 |---|---|
 | Orange Pi 5B (or similar ARM64 SBC) | Runs the Godot app |
 | XREAL Air 2 Pro | Connected to Pi via USB-C; appears as a 1920×1080 display |
-| Raspberry Pi + wide-angle fisheye lens | Streams RTSP video over local network |
+| Raspberry Pi vehicle node + CSI camera | Streams RTSP video over local network |
 | USB/Bluetooth gamepad | Connected to Orange Pi |
 
 ---
@@ -33,6 +40,12 @@ See [PRD.md](PRD.md) for full requirements and design decisions.
 ---
 
 ## Workflow
+
+### Scope split
+
+- The existing `deploy/` workflow in this repo is for the Orange Pi viewer runtime.
+- The Raspberry Pi vehicle node is now planned as a separate in-repo subsystem; see `docs/vehicle-node-prd.md` and issues `#10` through `#14`.
+- The viewer still uses the current UDP control packet described below. The target RC-channel successor protocol is documented in `docs/vehicle-node-prd.md` and will be adopted in a later viewer change.
 
 ### Build and deploy
 
@@ -160,6 +173,8 @@ port=9002
 
 All values little-endian. `aux_count` is 0 unless extended by future features.
 
+This is the current viewer-side packet shape. The planned successor protocol for the vehicle node is a fixed-length 8-channel RC-style packet with a small header; that migration is documented in `docs/vehicle-node-prd.md` and tracked in issue `#12`.
+
 **Telemetry input** (28 bytes, received from vehicle Pi):
 
 ```
@@ -268,6 +283,16 @@ the sidecar is listening on port 9001.
 | Full hardware stack on Pi + XREAL Air 2 Pro | Done — verified 2026-05-24 |
 | End-to-end FPV session (issue #9) | Needs RC vehicle + Pi camera connected |
 | OpenXR tracker for Meta Quest | Parked (future) |
+
+### Vehicle node roadmap
+
+The vehicle-side Raspberry Pi work is now explicitly tracked in-repo instead of living only as an external assumption:
+
+- `#10` image build and read-only appliance foundation
+- `#11` CSI camera RTSP streaming on the Pi 3 A+
+- `#12` dry-run Python vehicle daemon plus RC-channel contract docs
+- `#13` integrated appliance boot path
+- `#14` real ESC output enablement for the tracked vehicle
 
 ---
 

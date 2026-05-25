@@ -140,7 +140,7 @@ Godot's built-in `GUT` (Godot Unit Test) framework, or equivalent lightweight GD
 - Video recording or DVR functionality.
 - Android build. Orange Pi Linux ARM64 is the only non-Mac target at this stage.
 - XREAL NRSDK / Android XREAL integration.
-- Any Pi-side software (GStreamer pipeline, RC control firmware, telemetry transmitter). Those are separate projects.
+- Raspberry Pi vehicle-node implementation details are tracked separately from this viewer PRD in `docs/vehicle-node-prd.md`.
 
 ## Further Notes
 
@@ -149,3 +149,4 @@ Godot's built-in `GUT` (Godot Unit Test) framework, or equivalent lightweight GD
 - XRLinuxDriver marks XREAL support as not recommended (👎) due to XREAL's unwillingness to collaborate and the unofficial SDK. Monitor the driver project for regressions after XREAL firmware updates.
 - The GStreamer sidecar process approach is Linux-specific. When Android targets are introduced, this will need to be replaced with a GDExtension wrapping libavcodec or a similar cross-platform video decode library. The `VideoSource` abstraction isolates this change to one implementation class.
 - OpenTrack UDP payload format: 6 × `double` (little-endian), fields in order: `x, y, z, yaw, pitch, roll`. Values are in millimetres (x/y/z) and degrees (yaw/pitch/roll).
+- The viewer currently uses the documented `throttle + steering + head pose` control packet. A future RC-channel successor protocol is being planned in `docs/vehicle-node-prd.md` and should be treated as forward-looking until the viewer migration lands.

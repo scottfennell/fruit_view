@@ -4,7 +4,7 @@
 
 **fruit_view** is a Godot 4 FPV telepresence viewer for an RC vehicle. It renders a live wide-angle camera feed onto the interior of a hemisphere. The operator wears XREAL Air 2 Pro AR glasses on an Orange Pi SBC; head rotation moves the viewpoint inside the hemisphere. A gamepad controls the vehicle over UDP. Telemetry overlays (battery, speed, RSSI, GPS) float on the sphere surface.
 
-Full requirements: `PRD.md`. User-facing setup and workflow: `README.md`.
+Full viewer requirements: `PRD.md`. Vehicle-node planning: `docs/vehicle-node-prd.md`. User-facing setup and workflow: `README.md`.
 
 ---
 
@@ -158,6 +158,14 @@ rtspsrc location="<URL>" latency=0 protocols=tcp
 | OpenXR tracker (Meta Quest) | Parked — future work |
 
 ### Remaining hardware-only steps (issue #9)
+
+### Vehicle node planning
+
+Vehicle-side Raspberry Pi work is now tracked in-repo, but it is still a separate subsystem from the Godot viewer code described above.
+
+- PRD: `docs/vehicle-node-prd.md`
+- Issues: `#10` through `#14`
+- Important: the viewer code still implements the current `throttle + steering + head pose` packet. The RC-channel protocol in the vehicle-node PRD is planned work, not current viewer behavior.
 
 Issue #6 is fully closed. The remaining work requires RC vehicle + camera:
 
