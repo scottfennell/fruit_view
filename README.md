@@ -13,6 +13,11 @@ Current vehicle-node work is tracked in:
 - [#13](https://github.com/scottfennell/fruit_view/issues/13) Integrate camera and dry-run control into one appliance boot path
 - [#14](https://github.com/scottfennell/fruit_view/issues/14) Enable real tracked-drive ESC outputs
 
+Known-good vehicle-node bring-up now includes:
+- Wi-Fi + static IP on `192.168.86.18`
+- SSH to `pi@192.168.86.18`
+- RTSP stream at `rtsp://192.168.86.18:8554/stream`
+
 ---
 
 ## Hardware

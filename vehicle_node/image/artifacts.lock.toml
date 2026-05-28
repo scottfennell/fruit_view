@@ -1,0 +1,11 @@
+[raspios_lite_bookworm_armhf]
+version = "2025-05-13"
+filename = "2025-05-13-raspios-bookworm-armhf-lite.img.xz"
+url = "https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2025-05-13/2025-05-13-raspios-bookworm-armhf-lite.img.xz"
+sha256 = "a73d68b618c3ca40190c1aa04005a4dafcf32bc861c36c0d1fc6ddc48a370b6e"
+
+[mediamtx_linux_armv7]
+version = "v1.18.2"
+filename = "mediamtx_v1.18.2_linux_armv7.tar.gz"
+url = "https://github.com/bluenviron/mediamtx/releases/download/v1.18.2/mediamtx_v1.18.2_linux_armv7.tar.gz"
+sha256 = "d5eb3c9ce4c5466107016e53ac2258b50b476a796d6774ef9ce94260729a635c"

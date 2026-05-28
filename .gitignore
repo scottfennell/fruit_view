@@ -4,5 +4,12 @@
 # Export build artefacts
 build/
 
+# Vehicle-node local inputs and artefacts
+vehicle_node/.cache/
+vehicle_node/dist/
+vehicle_node/profiles/local/*.toml
+vehicle_node/profiles/local/keys/*
+!vehicle_node/profiles/local/.gitkeep
+
 # macOS
 .DS_Store

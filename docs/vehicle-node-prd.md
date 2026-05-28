@@ -167,6 +167,12 @@ Validation is filesystem-content validation only in v1. The build does not attem
 - camera service starts at boot and retries until networking is available
 - control remains independent of camera health
 
+Known-good implementation note from hardware bring-up:
+
+- `mediamtx v1.18.2` running as `fruit-mediamtx.service`
+- stream path `/stream`
+- first verified LAN URL `rtsp://192.168.86.18:8554/stream`
+
 Camera orientation, resolution, frame rate, bitrate, and related stream tuning live in the per-vehicle profile with repo defaults.
 
 ## Control Protocol Target
