@@ -1,6 +1,6 @@
 # fruit_view
 
-FPV telepresence viewer for an RC vehicle. Renders a live wide-angle camera feed onto the inside of a hemisphere. Head tracking via XREAL Air 2 Pro glasses rotates the viewpoint. Gamepad controls throttle and steering over UDP. Telemetry overlays (battery, speed, RSSI, GPS) float on the sphere surface.
+FPV telepresence viewer for an RC vehicle. Renders a live wide-angle camera feed onto the inside of a hemisphere. Head tracking via XREAL Air 2 Pro glasses rotates the viewpoint. Gamepad controls are mixed into an 8-channel RC UDP packet for the vehicle node. Telemetry overlays (battery, speed, RSSI, GPS) float on the sphere surface.
 
 Built with Godot 4 / GDScript. Runs on Orange Pi (Linux ARM64) + XREAL Air 2 Pro today; designed to swap to Meta Quest (OpenXR) later with no code changes.
 
@@ -51,7 +51,8 @@ Known-good vehicle-node bring-up now includes:
 
 - The existing `deploy/` workflow in this repo is for the Orange Pi viewer runtime.
 - The Raspberry Pi vehicle node is now planned as a separate in-repo subsystem; see `docs/vehicle-node-prd.md` and issues `#10` through `#14`.
-- The viewer still uses the current UDP control packet described below. The target RC-channel successor protocol is documented in `docs/vehicle-node-prd.md` and will be adopted in a later viewer change.
+- The viewer now speaks the same fixed-length 8-channel RC packet as the vehicle node.
+- The migration boundary is semantic, not wire-level: the viewer still owns `throttle/steering` input semantics and mixes them into `ch1/ch2` track outputs before transmission.
 
 ### Build and deploy
 
@@ -109,10 +110,14 @@ python3 ~/fruit_view/check_opentrack.py
 |---|---|
 | Left stick Y | Throttle |
 | Left stick X | Steering |
+| **A** (keyboard) | Toggle arm switch |
+| **South / A** (gamepad) | Toggle arm switch |
 | **Space** (keyboard) | Recenter head tracking |
 | **Back / Select** (gamepad) | Recenter head tracking |
 
 Recentering captures the current head pose as the new forward direction. Use it whenever the view feels misaligned after putting the glasses on.
+
+Arming is latched in the viewer and sent on RC `ch5`. The vehicle still enforces neutral-before-arm and low-then-high re-arm after a true `lost` event.
 
 ---
 
@@ -130,10 +135,11 @@ All settings live in `project.godot`. For Orange Pi production, `deploy/override
 | `head_tracker/opentrack_port` | `4242` | UDP port XRLinuxDriver sends to |
 | `head_tracker/sensitivity` | `1.0` | Rotation speed multiplier. Increase to look around faster. |
 | `video/source` | `local_file` | `local_file` or `rtsp_gstreamer` |
-| `video/rtsp_url` | `rtsp://192.168.1.100:8554/stream` | RTSP stream URL from camera Pi |
+| `video/rtsp_url` | `rtsp://192.168.86.18:8554/stream` | RTSP stream URL from camera Pi |
 | `video/sidecar_port` | `9001` | TCP port for the GStreamer sidecar |
-| `control/vehicle_host` | `192.168.1.100` | IP of the vehicle Pi |
+| `control/vehicle_host` | `192.168.86.18` | IP of the vehicle Pi |
 | `control/vehicle_port` | `9000` | UDP port on the vehicle Pi |
+| `control/vehicle_id` | `100` | Target vehicle profile id carried in RC packets |
 | `telemetry/port` | `9002` | Local UDP port for incoming telemetry |
 
 ### override.cfg (Pi production defaults)
@@ -146,11 +152,12 @@ sensitivity=1.0   ; increase for faster movement, e.g. 1.5
 
 [video]
 source="rtsp_gstreamer"
-rtsp_url="rtsp://192.168.1.100:8554/stream"   ; update to your camera Pi's IP
+rtsp_url="rtsp://192.168.86.18:8554/stream"   ; update to your camera Pi's IP
 
 [control]
-vehicle_host="192.168.1.100"   ; update to your vehicle Pi's IP
+vehicle_host="192.168.86.18"   ; update to your vehicle Pi's IP
 vehicle_port=9000
+vehicle_id=100                  ; update to match the vehicle profile
 
 [telemetry]
 port=9002
@@ -163,7 +170,7 @@ port=9002
 | Port | Protocol | Direction | Purpose |
 |---|---|---|---|
 | 4242 | UDP | in (from XRLinuxDriver) | OpenTrack head tracking |
-| 9000 | UDP | out (to vehicle Pi) | Control packets (throttle, steering, head pose) |
+| 9000 | UDP | out (to vehicle Pi) | Control packets (8-channel RC contract) |
 | 9001 | TCP | local | GStreamer sidecar → Godot frames |
 | 9002 | UDP | in (from vehicle Pi) | Telemetry (battery, speed, RSSI, GPS) |
 
@@ -174,12 +181,21 @@ port=9002
 **Control output** (sent to vehicle Pi every frame, or as keepalive every 0.5 s):
 
 ```
-[throttle:f32][steering:f32][head_yaw:f32][head_pitch:f32][aux_count:u8][aux[]:f32*]
+[magic:"FRC1"][version:u8][channel_count:u8][reserved:u16]
+[vehicle_id:u32][tick:u32][ch1:f32][ch2:f32][ch3:f32][ch4:f32][ch5:f32][ch6:f32][ch7:f32][ch8:f32]
 ```
 
-All values little-endian. `aux_count` is 0 unless extended by future features.
+All values are little-endian. `vehicle_id` and `tick` must match the vehicle-node contract.
 
-This is the current viewer-side packet shape. The vehicle node now also implements a documented fixed-length 8-channel RC-style successor packet; the viewer-side migration remains a separate follow-up tracked outside the current viewer runtime.
+Viewer-side semantic mapping:
+- `ch1 = clamp(throttle + steering)` left track
+- `ch2 = clamp(throttle - steering)` right track
+- `ch3 = clamp(head_yaw)` reserved camera pan value
+- `ch4 = clamp(head_pitch)` reserved camera tilt value
+- `ch5 = 1.0 when armed, else 0.0`
+- `ch6..ch8 = 0.0`
+
+Migration boundary: the old viewer semantic inputs still exist locally in `InputHandler`, but they are no longer sent over the wire as a semantic packet. The RC packet is now the only viewer-to-vehicle control contract.
 
 **Telemetry input** (28 bytes, received from vehicle Pi):
 
@@ -202,7 +218,7 @@ main.gd  (Node3D)
 │   ├── LocalFileSource         wraps VideoStreamPlayer
 │   └── RTSPGStreamerSource      spawns video_sidecar.py; receives RGBA frames over TCP
 ├── ControlOutput / InputHandler ─────────────────────────────────────
-│   └── UDPControlOutput        gamepad axes + head pose → UDP binary packet
+│   └── UDPControlOutput        gamepad semantics → mixed 8-channel RC UDP packet
 ├── TelemetryInput              UDP listener → battery/speed/RSSI/GPS signals
 └── TelemetryPanel (×4)         Label3D nodes at az=42°, el=±10°/±30°
 ```

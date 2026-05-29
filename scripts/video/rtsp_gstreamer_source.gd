@@ -13,7 +13,7 @@
 # drops or the stream stalls, RTSPGStreamerSource reconnects automatically.
 #
 # Configuration (project.godot):
-#   video/rtsp_url        — RTSP URL passed to the sidecar (default 192.168.1.100)
+#   video/rtsp_url        — RTSP URL passed to the sidecar (default 192.168.86.18)
 #   video/sidecar_port    — local TCP port for frames          (default 9001)
 #   video/sidecar_python  — path to python3 binary             (default "python3")
 
@@ -24,7 +24,7 @@ const SETTING_RTSP_URL := "video/rtsp_url"
 const SETTING_PORT     := "video/sidecar_port"
 const SETTING_PYTHON   := "video/sidecar_python"
 
-const DEFAULT_URL    := "rtsp://192.168.1.100:8554/stream"
+const DEFAULT_URL    := "rtsp://192.168.86.18:8554/stream"
 const DEFAULT_PORT   := 9001
 const DEFAULT_PYTHON := "python3"
 

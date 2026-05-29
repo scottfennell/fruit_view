@@ -35,7 +35,7 @@ main.gd  (Node3D root)
 │   ├── LocalFileSource       wraps VideoStreamPlayer
 │   └── RTSPGStreamerSource    spawns video_sidecar.py over TCP port 9001
 ├── InputHandler              gamepad axes; recenter on Space / JOY_BUTTON_BACK
-├── UDPControlOutput          throttle + steering + head pose → UDP binary packet
+├── UDPControlOutput          mixes viewer semantics into 8-channel RC UDP packet
 ├── TelemetryInput            UDP listener → battery/speed/RSSI/GPS signals
 └── TelemetryPanel ×4         Label3D nodes on sphere surface
 ```
@@ -62,10 +62,11 @@ Override on Orange Pi via `~/fruit_view/override.cfg` beside the binary — no r
 | `head_tracker/opentrack_port` | `4242` | `4242` |
 | `head_tracker/sensitivity` | `1.0` | tunable |
 | `video/source` | `local_file` | `rtsp_gstreamer` |
-| `video/rtsp_url` | `rtsp://192.168.1.100:8554/stream` | real camera URL |
+| `video/rtsp_url` | `rtsp://192.168.86.18:8554/stream` | real camera URL |
 | `video/sidecar_port` | `9001` | `9001` |
-| `control/vehicle_host` | `192.168.1.100` | real vehicle IP |
+| `control/vehicle_host` | `192.168.86.18` | real vehicle IP |
 | `control/vehicle_port` | `9000` | `9000` |
+| `control/vehicle_id` | `100` | current `rcmower` profile id |
 | `telemetry/port` | `9002` | `9002` |
 
 ---
@@ -165,7 +166,7 @@ Vehicle-side Raspberry Pi work is now tracked in-repo, but it is still a separat
 
 - PRD: `docs/vehicle-node-prd.md`
 - Issues: `#10` through `#14`
-- Important: the viewer code still implements the current `throttle + steering + head pose` packet. The RC-channel protocol in the vehicle-node PRD is planned work, not current viewer behavior.
+- Important: the viewer now emits the same fixed-length 8-channel RC packet as the vehicle node. The migration boundary is that the viewer still owns semantic input mixing (`throttle/steering/head pose`) before serializing RC channels.
 
 Issue #6 is fully closed. The remaining work requires RC vehicle + camera:
 

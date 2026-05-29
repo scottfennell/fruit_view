@@ -6,6 +6,9 @@ How the engineering skills should consume this repo's domain documentation when 
 
 - **`CONTEXT.md`** at the repo root — canonical domain glossary and key architecture decisions
 - **`docs/adr/`** — read ADRs that touch the area you are about to work in
+- **`README.md`** — current operator-facing runtime contract, including the active viewer-to-vehicle RC packet
+- **`vehicle_node/docs/rc-protocol.md`** — canonical wire-level control packet for viewer and vehicle-node integration
+- **`docs/vehicle-node-prd.md`** — subsystem boundary and migration notes between viewer semantics and RC channels
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront.
 
@@ -19,6 +22,7 @@ Single-context repo:
 ├── docs/
 │   ├── agents/          ← skill configuration (this dir)
 │   └── adr/             ← architectural decision records
+├── vehicle_node/        ← Raspberry Pi vehicle-node subsystem and protocol docs
 ├── scripts/
 ├── scenes/
 ├── shaders/

@@ -24,8 +24,9 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [control]
 
-vehicle_host="192.168.1.100"
+vehicle_host="192.168.86.18"
 vehicle_port=9000
+vehicle_id=100
 keepalive_interval_sec=0.5
 
 [display]
@@ -58,6 +59,6 @@ port=9002
 
 source="local_file"
 local_file_path=""
-rtsp_url="rtsp://192.168.1.100:8554/stream"
+rtsp_url="rtsp://192.168.86.18:8554/stream"
 sidecar_port=9001
 sidecar_python="python3"

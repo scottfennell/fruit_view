@@ -3,11 +3,14 @@
 # Reads gamepad axis values each frame, applies a deadzone, and forwards
 # throttle + steering + head pose to ControlOutput.
 #
-# Head yaw and pitch are included in every packet so the vehicle Pi can relay
-# them to a gimbal without any additional glue code.
+# The output layer mixes throttle + steering into tracked left/right RC channels.
+# Head yaw and pitch are carried in the reserved camera channels for future use.
 #
 # Recenter: press Space (keyboard) or the gamepad Back/Select button to capture
 # the current head pose as the new forward direction.
+#
+# Arm toggle: press A (keyboard) or the gamepad South button to toggle the
+# viewer-side arm switch channel.
 #
 # Configuration (project.godot):
 #   input_map/throttle_axis — JoyAxis index for throttle (default JOY_AXIS_LEFT_Y = 1)
@@ -25,12 +28,15 @@ const DEADZONE              := 0.05
 # Recenter bindings (not configurable at runtime — change here if needed).
 const RECENTER_KEY    := KEY_SPACE
 const RECENTER_BUTTON := JOY_BUTTON_BACK  # gamepad Select / Back / Share
+const ARM_TOGGLE_KEY    := KEY_A
+const ARM_TOGGLE_BUTTON := JOY_BUTTON_A
 
 var control_output: ControlOutput
 var head_tracker:   HeadTracker
 
 var _throttle_axis: int
 var _steering_axis: int
+var _armed:         bool = false
 
 
 func _ready() -> void:
@@ -47,10 +53,14 @@ func _input(event: InputEvent) -> void:
 		var key := event as InputEventKey
 		if key.pressed and not key.echo and key.keycode == RECENTER_KEY:
 			_recenter()
+		elif key.pressed and not key.echo and key.keycode == ARM_TOGGLE_KEY:
+			_toggle_arm()
 	elif event is InputEventJoypadButton:
 		var btn := event as InputEventJoypadButton
 		if btn.pressed and btn.button_index == RECENTER_BUTTON:
 			_recenter()
+		elif btn.pressed and btn.button_index == ARM_TOGGLE_BUTTON:
+			_toggle_arm()
 
 
 func _process(_delta: float) -> void:
@@ -71,9 +81,13 @@ func _process(_delta: float) -> void:
 		head_yaw   = rot.y
 		head_pitch = rot.x
 
-	control_output.send(throttle, steering, head_yaw, head_pitch)
+	control_output.send(throttle, steering, head_yaw, head_pitch, _armed)
 
 
 func _recenter() -> void:
 	if head_tracker != null:
 		head_tracker.recenter()
+
+
+func _toggle_arm() -> void:
+	_armed = not _armed
