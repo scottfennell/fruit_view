@@ -23,7 +23,7 @@ Unknown fields are rejected everywhere, including nested tables.
 
 ## Passwords
 
-`admin.password_hash` stores the final SHA-512 password hash written into Raspberry Pi OS `userconf.txt`. Generate one locally with:
+`admin.password_hash` stores the final SHA-512 password hash rendered into Raspberry Pi OS `custom.toml` for first-boot user provisioning. Generate one locally with:
 
 ```bash
 openssl passwd -6

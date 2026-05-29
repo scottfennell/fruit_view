@@ -18,6 +18,30 @@ What is still hardware-gated:
 - integrated appliance boot validation on a flashed Pi (`#13`)
 - real ESC output timing and drivetrain characterization (`#14`)
 
+## Known-Good Dry-Run Control Setup
+
+The current known-good dry-run control path is:
+
+- `fruit-vehicle.service` active on the Pi at boot
+- UDP control listener on port `9000`
+- telemetry return port `9002`
+- `vehicle_id = 100` for the current `rcmower` profile
+- active-session lock, arming, and degraded transition verified on hardware
+
+Useful checks on the Pi:
+
+```bash
+systemctl status fruit-vehicle.service
+journalctl -u fruit-vehicle.service -n 100 -o cat
+ss -lunp | grep 9000
+```
+
+Useful packet-sender check from another machine:
+
+```bash
+python3 vehicle_node/tools/send_test_rc_packet.py --host 192.168.86.18 --vehicle-id 100 --arm 1.0
+```
+
 ## Known-Good RTSP Setup
 
 The current known-good vehicle-node camera path is:

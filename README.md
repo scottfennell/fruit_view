@@ -17,6 +17,7 @@ Known-good vehicle-node bring-up now includes:
 - Wi-Fi + static IP on `192.168.86.18`
 - SSH to `pi@192.168.86.18`
 - RTSP stream at `rtsp://192.168.86.18:8554/stream`
+- `fruit-vehicle.service` accepting the 8-channel dry-run RC packet on `udp/9000`
 
 ---
 
@@ -178,7 +179,7 @@ port=9002
 
 All values little-endian. `aux_count` is 0 unless extended by future features.
 
-This is the current viewer-side packet shape. The planned successor protocol for the vehicle node is a fixed-length 8-channel RC-style packet with a small header; that migration is documented in `docs/vehicle-node-prd.md` and tracked in issue `#12`.
+This is the current viewer-side packet shape. The vehicle node now also implements a documented fixed-length 8-channel RC-style successor packet; the viewer-side migration remains a separate follow-up tracked outside the current viewer runtime.
 
 **Telemetry input** (28 bytes, received from vehicle Pi):
 
@@ -294,8 +295,8 @@ the sidecar is listening on port 9001.
 The vehicle-side Raspberry Pi work is now explicitly tracked in-repo instead of living only as an external assumption:
 
 - `#10` image build and read-only appliance foundation
-- `#11` CSI camera RTSP streaming on the Pi 3 A+
-- `#12` dry-run Python vehicle daemon plus RC-channel contract docs
+- `#11` CSI camera RTSP streaming on the Pi 3 A+ (done)
+- `#12` dry-run Python vehicle daemon plus RC-channel contract docs (done)
 - `#13` integrated appliance boot path
 - `#14` real ESC output enablement for the tracked vehicle
 

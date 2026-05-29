@@ -8,7 +8,7 @@ The vehicle node needs to behave like a small appliance rather than a general-pu
 
 ## Solution
 
-Build a Raspberry Pi 3 A+ vehicle-node image generator inside this repo. The generator produces a fully personalized Raspberry Pi OS Lite 32-bit image for one vehicle profile. That image boots directly into a read-only appliance with:
+Build a Raspberry Pi 3 A+ vehicle-node image generator inside this repo. The generator produces a fully personalized Raspberry Pi OS Lite 32-bit image for one vehicle profile. The current implementation boots directly into a working writable-root appliance, while read-only hardening remains deferred to follow-up issue `#10`, with:
 
 - Wi-Fi client networking and a true static IP
 - SSH access for administration
@@ -23,7 +23,7 @@ The long-term control boundary becomes a generic 8-channel RC-style UDP protocol
 1. Generate a fully flashable Raspberry Pi image locally from a single high-level command.
 2. Keep real per-vehicle secrets and network settings out of git.
 3. Make the flashed system boot directly into a working appliance with no interactive setup.
-4. Keep root and boot read-only during normal operation.
+4. Preserve a clean path to read-only hardening after the functional appliance path is proven.
 5. Stream camera video over RTSP to the existing viewer architecture.
 6. Run the first tracked-vehicle control stack directly on the Pi using two ESC outputs.
 7. Preserve a clean path toward a shared RC-channel protocol for future vehicles and transports.
@@ -115,11 +115,9 @@ Validation is filesystem-content validation only in v1. The build does not attem
 ### Appliance Behavior
 
 - system boots directly into services, not an interactive desktop session
-- root partition is read-only in normal operation
-- boot partition is read-only in normal operation
-- runtime writable paths use RAM-backed state
-- local logs are RAM-only and disappear on reboot
+- current implementation uses the stock writable Raspberry Pi OS boot/root model
 - normal time sync is enabled
+- read-only boot/root remains a hardening target, not a current implementation guarantee
 
 ### Update and Recovery Model
 
