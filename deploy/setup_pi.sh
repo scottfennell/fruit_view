@@ -17,6 +17,7 @@ echo ""
 echo "[1/3] Installing Python3 + GStreamer..."
 sudo apt-get update -qq
 sudo apt-get install -y \
+    mesa-utils \
     python3 \
     python3-gi \
     python3-gi-cairo \

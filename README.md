@@ -89,6 +89,23 @@ xr_driver_setup   # configure OpenTrack UDP output, port 4242
 
 # If the XREAL is not screen 0 (check with: xrandr --listmonitors):
 SCREEN=1 ~/fruit_view/launch.sh
+
+# Force the old desktop GL path for comparison/debugging:
+RENDERING_DRIVER=opengl3 ~/fruit_view/launch.sh
+```
+
+`launch.sh` now defaults to `--rendering-driver opengl3_es` on the Pi. On the
+current Orange Pi X11 image, that uses the hardware Mali GLES path instead of
+the `llvmpipe` desktop GL fallback.
+
+### Validating rendering (before launching)
+
+```bash
+~/fruit_view/check_renderer.sh
+# Look for:
+# - glxinfo -> llvmpipe (expected on the current image)
+# - es2_info -> GL_RENDERER: Mali-G610
+# - Godot startup probe -> Using Device: ARM - Mali-G610
 ```
 
 XRLinuxDriver starts automatically on boot via a systemd user service installed
@@ -265,11 +282,18 @@ The decode path is currently fixed as `rtspsrc → rtph264depay → avdec_h264 �
 H.265 (HEVC), MJPEG, and VP8/VP9 are **not** supported by the current pipeline.
 To add support, replace `rtph264depay ! avdec_h264` in `sidecar/video_sidecar.py`.
 
-### Orange Pi performance note
+### Orange Pi renderer note
 
-Current Orange Pi playback is still limited by Godot falling back to Mesa `llvmpipe` software rendering instead of an accelerated GL path. The RTSP sidecar tuning knobs above are a mitigation to keep hardware validation moving, not the final performance fix.
+The current Orange Pi Jammy image exposes two different rendering paths:
+
+- Desktop `GLX/OpenGL` still reports Mesa `llvmpipe`
+- `EGL/GLES` reports `GL_RENDERER: Mali-G610`
+
+Godot 4.6 on Linux can use the GLES-backed compatibility driver via `--rendering-driver opengl3_es`. The Pi launcher now defaults to that path so the deployed viewer uses the hardware Mali renderer on the current X11 setup.
 
 - Pi production defaults currently ship as `960x540 @ 30fps`
+- `~/fruit_view/check_renderer.sh` should show `Using Device: ARM - Mali-G610` in the Godot probe
+- `RENDERING_DRIVER=opengl3 ~/fruit_view/launch.sh` forces the old desktop GL path for comparison/debugging
 - Issue `#17` tracks getting the viewer off `llvmpipe`
 - Issue `#16` tracks an in-app head-tracker drift calibration workflow
 

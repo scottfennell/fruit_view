@@ -50,6 +50,7 @@ ssh "$REMOTE" "mkdir -p ~/${PI_DIR}"
 #   video_sidecar.py        — GStreamer TCP frame server (must live beside the binary)
 #   override.cfg            — Godot project settings override for Pi production
 #   launch.sh               — launcher wrapper
+#   check_renderer.sh       — diagnostic: prints active GL/GLES path
 #   setup_pi.sh             — one-time dependency installer
 #   check_opentrack.py      — diagnostic: prints XRLinuxDriver head tracking packets
 rsync -avz --progress \
@@ -57,6 +58,7 @@ rsync -avz --progress \
     "$PROJECT_ROOT/sidecar/video_sidecar.py" \
     "$SCRIPT_DIR/override.cfg" \
     "$SCRIPT_DIR/launch.sh" \
+    "$SCRIPT_DIR/check_renderer.sh" \
     "$SCRIPT_DIR/setup_pi.sh" \
     "$SCRIPT_DIR/check_opentrack.py" \
     "${REMOTE}:~/${PI_DIR}/"
@@ -64,8 +66,9 @@ rsync -avz --progress \
 # Ensure scripts are executable
 ssh "$REMOTE" \
     "chmod +x ~/${PI_DIR}/fruit_view_linux_arm64 \
-              ~/${PI_DIR}/launch.sh \
-              ~/${PI_DIR}/setup_pi.sh"
+               ~/${PI_DIR}/launch.sh \
+               ~/${PI_DIR}/check_renderer.sh \
+               ~/${PI_DIR}/setup_pi.sh"
 
 echo ""
 echo "Deploy complete."
@@ -80,5 +83,7 @@ echo "  1. Connect XREAL Air 2 Pro to the Pi via USB-C"
 echo "  2. Start XRLinuxDriver:  ssh ${REMOTE} 'xr_driver_start'"
 echo "  3. Verify head tracking: ssh ${REMOTE} 'python3 ~/${PI_DIR}/check_opentrack.py'"
 echo "     (move the glasses and confirm yaw/pitch values change, then Ctrl+C)"
-echo "  4. Launch the app:       ssh ${REMOTE} '~/${PI_DIR}/launch.sh'"
-echo "     (or: SCREEN=1 ~/${PI_DIR}/launch.sh  if XREAL is not screen 0)"
+echo "  4. Verify rendering:     ssh ${REMOTE} '~/${PI_DIR}/check_renderer.sh'"
+echo "     (look for 'Using Device: ARM - Mali-G610' in the Godot probe)"
+echo "  5. Launch the app:       ssh ${REMOTE} '~/${PI_DIR}/launch.sh'"
+echo "     (or: SCREEN=1 ~/${PI_DIR}/launch.sh if XREAL is not screen 0)"
