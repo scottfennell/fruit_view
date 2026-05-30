@@ -32,8 +32,10 @@ import threading
 
 try:
     import gi
+
     gi.require_version("Gst", "1.0")
     from gi.repository import Gst, GLib
+
     Gst.init(None)
 except (ImportError, ValueError) as exc:
     print(f"ERROR: GStreamer Python bindings unavailable: {exc}", file=sys.stderr)
@@ -44,13 +46,24 @@ except (ImportError, ValueError) as exc:
 class FrameSender:
     """Manages one GStreamer pipeline and streams frames to a TCP client."""
 
-    def __init__(self, port: int, source_uri: str, is_file: bool) -> None:
-        self._port       = port
+    def __init__(
+        self,
+        port: int,
+        source_uri: str,
+        is_file: bool,
+        width: int,
+        height: int,
+        fps: int,
+    ) -> None:
+        self._port = port
         self._source_uri = source_uri
-        self._is_file    = is_file
+        self._is_file = is_file
+        self._width = width
+        self._height = height
+        self._fps = fps
         self._client: socket.socket | None = None
         self._client_lock = threading.Lock()
-        self._pipeline   = None
+        self._pipeline = None
         self._loop: GLib.MainLoop | None = None
 
     # ── Public entry point ────────────────────────────────────────────────────
@@ -72,8 +85,10 @@ class FrameSender:
                 with self._client_lock:
                     self._client = None
                 conn.close()
-                print("[sidecar] Client disconnected — waiting for reconnect …",
-                      flush=True)
+                print(
+                    "[sidecar] Client disconnected — waiting for reconnect …",
+                    flush=True,
+                )
         except KeyboardInterrupt:
             print("[sidecar] Shutting down.", flush=True)
         finally:
@@ -87,15 +102,29 @@ class FrameSender:
         else:
             src = (
                 f'rtspsrc location="{self._source_uri}" latency=0 '
-                f'protocols=tcp '
-                f'! rtph264depay ! avdec_h264'
+                f"protocols=tcp "
+                f"! rtph264depay ! avdec_h264"
             )
+        filters = []
+        if self._fps > 0:
+            filters.append(f"videorate ! video/x-raw,framerate={self._fps}/1")
+        if self._width > 0 or self._height > 0:
+            caps = ["format=RGBA"]
+            if self._width > 0:
+                caps.append(f"width={self._width}")
+            if self._height > 0:
+                caps.append(f"height={self._height}")
+            filters.append("videoscale")
+            filters.append(f"video/x-raw,{','.join(caps)}")
+        else:
+            filters.append("video/x-raw,format=RGBA")
         # max-buffers=1 drop=true: always deliver the latest frame, never queue.
         return (
-            f'{src}'
-            f' ! videoconvert'
-            f' ! video/x-raw,format=RGBA'
-            f' ! appsink name=sink emit-signals=true max-buffers=1 drop=true'
+            f"{src}"
+            f" ! videoconvert"
+            f" ! "
+            + " ! ".join(filters)
+            + f" ! appsink name=sink emit-signals=true max-buffers=1 drop=true"
         )
 
     def _run_pipeline(self) -> None:
@@ -126,11 +155,11 @@ class FrameSender:
         if sample is None:
             return Gst.FlowReturn.ERROR
 
-        buf      = sample.get_buffer()
-        caps     = sample.get_caps()
-        st       = caps.get_structure(0)
-        width    = st.get_int("width").value
-        height   = st.get_int("height").value
+        buf = sample.get_buffer()
+        caps = sample.get_caps()
+        st = caps.get_structure(0)
+        width = st.get_int("width").value
+        height = st.get_int("height").value
 
         ok, map_info = buf.map(Gst.MapFlags.READ)
         if not ok:
@@ -138,7 +167,7 @@ class FrameSender:
         frame_bytes = bytes(map_info.data)
         buf.unmap(map_info)
 
-        header  = struct.pack("<II", width, height)
+        header = struct.pack("<II", width, height)
         payload = header + frame_bytes
 
         with self._client_lock:
@@ -155,8 +184,11 @@ class FrameSender:
     def _on_bus_message(self, _bus, message) -> None:
         if message.type == Gst.MessageType.ERROR:
             err, dbg = message.parse_error()
-            print(f"[sidecar] GStreamer error: {err}\n  debug: {dbg}",
-                  file=sys.stderr, flush=True)
+            print(
+                f"[sidecar] GStreamer error: {err}\n  debug: {dbg}",
+                file=sys.stderr,
+                flush=True,
+            )
             if self._loop and self._loop.is_running():
                 GLib.idle_add(self._loop.quit)
         elif message.type == Gst.MessageType.EOS:
@@ -167,23 +199,43 @@ class FrameSender:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="fruit_view GStreamer video sidecar"
+    parser = argparse.ArgumentParser(description="fruit_view GStreamer video sidecar")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=9001,
+        help="Local TCP port to listen on (default: 9001)",
     )
     parser.add_argument(
-        "--port", type=int, default=9001,
-        help="Local TCP port to listen on (default: 9001)"
+        "--width", type=int, default=0, help="Optional output frame width after scaling"
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=0,
+        help="Optional output frame height after scaling",
+    )
+    parser.add_argument(
+        "--fps", type=int, default=0, help="Optional max output frame rate"
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--url",  metavar="RTSP_URL",  help="RTSP stream URL")
+    group.add_argument("--url", metavar="RTSP_URL", help="RTSP stream URL")
     group.add_argument("--file", metavar="FILE_PATH", help="Local video file path")
     args = parser.parse_args()
 
     is_file = args.file is not None
-    source  = args.file if is_file else args.url
+    source = args.file if is_file else args.url
 
-    FrameSender(port=args.port, source_uri=source, is_file=is_file).run()
+    FrameSender(
+        port=args.port,
+        source_uri=source,
+        is_file=is_file,
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+    ).run()
 
 
 if __name__ == "__main__":

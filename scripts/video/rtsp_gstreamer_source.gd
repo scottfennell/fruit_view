@@ -23,10 +23,16 @@ extends VideoSource
 const SETTING_RTSP_URL := "video/rtsp_url"
 const SETTING_PORT     := "video/sidecar_port"
 const SETTING_PYTHON   := "video/sidecar_python"
+const SETTING_WIDTH    := "video/sidecar_width"
+const SETTING_HEIGHT   := "video/sidecar_height"
+const SETTING_FPS      := "video/sidecar_fps"
 
 const DEFAULT_URL    := "rtsp://192.168.86.18:8554/stream"
 const DEFAULT_PORT   := 9001
 const DEFAULT_PYTHON := "python3"
+const DEFAULT_WIDTH   := 0
+const DEFAULT_HEIGHT  := 0
+const DEFAULT_FPS     := 0
 
 const RECONNECT_INTERVAL := 3.0  # seconds between connection attempts
 const HEADER_SIZE        := 8    # width(u32) + height(u32)
@@ -45,9 +51,8 @@ var _ever_connected:   bool           = false
 var _recv: PackedByteArray = PackedByteArray()
 
 # ── Output texture ────────────────────────────────────────────────────────────
-# Null until the first frame arrives. Use create_from_image() on first frame,
-# then update() on subsequent frames (update() requires an already-initialised
-# texture with matching dimensions).
+# Null until the first frame arrives. We use set_image() for live RTSP frames
+# because the Orange Pi driver stack has been unreliable with ImageTexture.update().
 var _texture:   ImageTexture = null
 var _has_frame: bool         = false
 
@@ -58,12 +63,18 @@ var _sidecar_pid: int = -1
 var _rtsp_url: String
 var _port:     int
 var _python:   String
+var _sidecar_width:  int
+var _sidecar_height: int
+var _sidecar_fps:    int
 
 
 func _ready() -> void:
 	_rtsp_url = ProjectSettings.get_setting(SETTING_RTSP_URL, DEFAULT_URL)    as String
 	_port     = ProjectSettings.get_setting(SETTING_PORT,     DEFAULT_PORT)   as int
 	_python   = ProjectSettings.get_setting(SETTING_PYTHON,   DEFAULT_PYTHON) as String
+	_sidecar_width = ProjectSettings.get_setting(SETTING_WIDTH, DEFAULT_WIDTH) as int
+	_sidecar_height = ProjectSettings.get_setting(SETTING_HEIGHT, DEFAULT_HEIGHT) as int
+	_sidecar_fps = ProjectSettings.get_setting(SETTING_FPS, DEFAULT_FPS) as int
 	_spawn_sidecar()
 
 
@@ -76,6 +87,9 @@ func _process(delta: float) -> void:
 		return
 
 	_peer.poll()
+
+	if _peer.get_status() == StreamPeerTCP.STATUS_CONNECTING:
+		return
 
 	if _peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
 		_connected = false
@@ -109,7 +123,7 @@ func get_status_text() -> String:
 
 func _spawn_sidecar() -> void:
 	var script := _resolve_sidecar_path()
-	var args   := [script, "--port", str(_port), "--url", _rtsp_url]
+	var args   := _build_sidecar_args(script)
 	_sidecar_pid = OS.create_process(_python, args)
 	if _sidecar_pid < 0:
 		push_error("RTSPGStreamerSource: failed to spawn sidecar. " +
@@ -117,6 +131,20 @@ func _spawn_sidecar() -> void:
 	else:
 		print("RTSPGStreamerSource: sidecar PID %d, port %d, script: %s" \
 			  % [_sidecar_pid, _port, script])
+
+
+func _build_sidecar_args(script: String) -> PackedStringArray:
+	var args := PackedStringArray([script, "--port", str(_port), "--url", _rtsp_url])
+	if _sidecar_width > 0:
+		args.append("--width")
+		args.append(str(_sidecar_width))
+	if _sidecar_height > 0:
+		args.append("--height")
+		args.append(str(_sidecar_height))
+	if _sidecar_fps > 0:
+		args.append("--fps")
+		args.append(str(_sidecar_fps))
+	return args
 
 
 # Returns the filesystem path to video_sidecar.py.
@@ -139,9 +167,9 @@ func _attempt_connect() -> void:
 	var err := _peer.connect_to_host("127.0.0.1", _port)
 	if err != OK:
 		return
-	_connected = true
+	_connected = _peer.get_status() != StreamPeerTCP.STATUS_NONE
 	_recv      = PackedByteArray()
-	print("RTSPGStreamerSource: connected to sidecar on port %d." % _port)
+	print("RTSPGStreamerSource: connecting to sidecar on port %d." % _port)
 
 
 # ── Private: frame assembly ───────────────────────────────────────────────────
@@ -156,6 +184,12 @@ func _drain_recv_buffer() -> void:
 
 
 func _consume_frames() -> void:
+	var last_width  := 0
+	var last_height := 0
+	var last_pixels := PackedByteArray()
+	var consumed    := 0
+	var found_frame := false
+
 	while _recv.size() >= HEADER_SIZE:
 		var w          := _recv.decode_u32(0)
 		var h          := _recv.decode_u32(4)
@@ -165,8 +199,17 @@ func _consume_frames() -> void:
 		if _recv.size() < total:
 			break  # Wait for the rest of the frame
 
-		_handle_complete_frame(w, h, _recv.slice(HEADER_SIZE, total))
-		_recv = _recv.slice(total)
+		last_width  = w
+		last_height = h
+		last_pixels = _recv.slice(HEADER_SIZE, total)
+		consumed    = total
+		found_frame = true
+		_recv       = _recv.slice(total)
+
+	if found_frame:
+		# If multiple frames arrived since the last tick, render only the newest one.
+		# This keeps live video responsive instead of replaying stale buffered frames.
+		_handle_complete_frame(last_width, last_height, last_pixels)
 
 
 # Handle a fully-assembled frame. Exposed for unit testing (avoids needing a
@@ -175,13 +218,12 @@ func _handle_complete_frame(width: int, height: int, rgba_data: PackedByteArray)
 	var img := Image.create_from_data(
 		width, height, false, Image.FORMAT_RGBA8, rgba_data
 	)
-	if _texture == null or _texture.get_width() != width or _texture.get_height() != height:
-		# First frame or resolution change — create a new ImageTexture.
-		# ImageTexture.update() requires an already-initialised texture with
-		# matching dimensions, so we use create_from_image() here.
-		_texture = ImageTexture.create_from_image(img)
-	else:
-		_texture.update(img)
+	if _texture == null:
+		_texture = ImageTexture.new()
+	# Rebuild the backing texture from each decoded frame. This is less efficient
+	# than update(), but avoids persistent update() failures on the Orange Pi GL
+	# driver and keeps the live video path working for hardware validation.
+	_texture.set_image(img)
 	_has_frame      = true
 	_ever_connected = true
 

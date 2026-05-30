@@ -31,6 +31,10 @@ func test_handle_frame_makes_texture_non_null() -> void:
 	_source._handle_complete_frame(4, 4, data)
 	assert_not_null(_source.get_texture(),
 		"get_texture() should return a texture after _handle_complete_frame()")
+	assert_eq(_source.get_texture().get_width(), 4,
+		"Texture width should match the received frame width")
+	assert_eq(_source.get_texture().get_height(), 4,
+		"Texture height should match the received frame height")
 
 
 func test_handle_frame_sets_is_playing() -> void:
@@ -44,11 +48,14 @@ func test_handle_frame_sets_is_playing() -> void:
 
 func test_handle_frame_updates_texture_on_second_call() -> void:
 	_source._handle_complete_frame(2, 2, _solid_rgba(2, 2, 255, 0, 0, 255))
-	var first := _source.get_texture()
 	_source._handle_complete_frame(4, 4, _solid_rgba(4, 4, 0, 0, 255, 255))
 	# Texture object may be replaced on resolution change — still non-null.
 	assert_not_null(_source.get_texture(),
 		"Texture should remain valid after a second frame")
+	assert_eq(_source.get_texture().get_width(), 4,
+		"Texture width should follow the latest frame width")
+	assert_eq(_source.get_texture().get_height(), 4,
+		"Texture height should follow the latest frame height")
 
 
 # ── _consume_frames (buffer logic) ───────────────────────────────────────────
@@ -63,12 +70,16 @@ func test_consume_frames_parses_single_frame() -> void:
 func test_consume_frames_handles_two_frames_in_buffer() -> void:
 	var buf := PackedByteArray()
 	buf.append_array(_framed(2, 2, _solid_rgba(2, 2, 255, 0, 0, 255)))
-	buf.append_array(_framed(2, 2, _solid_rgba(2, 2, 0, 255, 0, 255)))
+	buf.append_array(_framed(3, 3, _solid_rgba(3, 3, 0, 255, 0, 255)))
 	_source._recv = buf
 	_source._consume_frames()
 	# Both frames consumed — buffer should be empty
 	assert_eq(_source._recv.size(), 0,
 		"Buffer should be empty after consuming two complete frames")
+	assert_eq(_source.get_texture().get_width(), 3,
+		"When multiple frames are buffered, the latest frame should win")
+	assert_eq(_source.get_texture().get_height(), 3,
+		"Latest buffered frame dimensions should be applied")
 
 
 func test_consume_frames_waits_for_incomplete_frame() -> void:
@@ -120,6 +131,21 @@ func test_disconnect_triggers_reconnect_timer() -> void:
 		"_connected should become false when the peer is no longer STATUS_CONNECTED")
 
 
+func test_build_sidecar_args_includes_optional_limits() -> void:
+	_source._port = 9001
+	_source._rtsp_url = "rtsp://example/stream"
+	_source._sidecar_width = 960
+	_source._sidecar_height = 540
+	_source._sidecar_fps = 30
+	var args := _source._build_sidecar_args("/tmp/video_sidecar.py")
+	assert_eq(args,
+		PackedStringArray([
+			"/tmp/video_sidecar.py", "--port", "9001", "--url", "rtsp://example/stream",
+			"--width", "960", "--height", "540", "--fps", "30"
+		]),
+		"Sidecar args should include configured width/height/fps limits")
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 # Build a PackedByteArray of solid RGBA pixels (w × h pixels).
@@ -142,4 +168,3 @@ func _framed(w: int, h: int, rgba: PackedByteArray) -> PackedByteArray:
 	header.encode_u32(4, h)
 	header.append_array(rgba)
 	return header
-
