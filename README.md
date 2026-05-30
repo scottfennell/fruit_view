@@ -137,6 +137,9 @@ All settings live in `project.godot`. For Orange Pi production, `deploy/override
 | `video/source` | `local_file` | `local_file` or `rtsp_gstreamer` |
 | `video/rtsp_url` | `rtsp://192.168.86.18:8554/stream` | RTSP stream URL from camera Pi |
 | `video/sidecar_port` | `9001` | TCP port for the GStreamer sidecar |
+| `video/sidecar_width` | `0` | Optional RTSP sidecar output width. `0` keeps source resolution. |
+| `video/sidecar_height` | `0` | Optional RTSP sidecar output height. `0` keeps source resolution. |
+| `video/sidecar_fps` | `0` | Optional RTSP sidecar output frame-rate cap. `0` keeps source rate. |
 | `control/vehicle_host` | `192.168.86.18` | IP of the vehicle Pi |
 | `control/vehicle_port` | `9000` | UDP port on the vehicle Pi |
 | `control/vehicle_id` | `100` | Target vehicle profile id carried in RC packets |
@@ -153,6 +156,9 @@ sensitivity=1.0   ; increase for faster movement, e.g. 1.5
 [video]
 source="rtsp_gstreamer"
 rtsp_url="rtsp://192.168.86.18:8554/stream"   ; update to your camera Pi's IP
+sidecar_width=960                              ; lower for better latency on current Pi runtime
+sidecar_height=540
+sidecar_fps=30
 
 [control]
 vehicle_host="192.168.86.18"   ; update to your vehicle Pi's IP
@@ -233,7 +239,7 @@ are needed to switch between Mac dev mode and Orange Pi production.
 ```
 RC vehicle Pi camera
   → GStreamer RTSP server (H.264, RTP/RTSP)
-  → video_sidecar.py  [rtspsrc ! rtph264depay ! avdec_h264 ! videoconvert ! RGBA appsink]
+  → video_sidecar.py  [rtspsrc ! rtph264depay ! avdec_h264 ! videoconvert ! videorate? ! videoscale? ! RGBA appsink]
   → TCP localhost:9001  (raw RGBA frames: 4-byte width, 4-byte height, width×height×4 pixels)
   → RTSPGStreamerSource  (TCP client; assembles frames into ImageTexture)
   → hemisphere.gdshader  (unlit, equirectangular UV)
@@ -245,7 +251,7 @@ in the PCK) so Python can execute it directly.
 ### Required camera video format
 
 The GStreamer sidecar expects the RTSP stream to contain **H.264 video**.
-The pipeline is fixed as: `rtspsrc → rtph264depay → avdec_h264 → videoconvert → RGBA`.
+The decode path is currently fixed as `rtspsrc → rtph264depay → avdec_h264 → videoconvert`, with optional `videorate` and `videoscale` stages controlled by `video/sidecar_fps`, `video/sidecar_width`, and `video/sidecar_height`.
 
 | Property | Requirement |
 |---|---|
@@ -258,6 +264,14 @@ The pipeline is fixed as: `rtspsrc → rtph264depay → avdec_h264 → videoconv
 
 H.265 (HEVC), MJPEG, and VP8/VP9 are **not** supported by the current pipeline.
 To add support, replace `rtph264depay ! avdec_h264` in `sidecar/video_sidecar.py`.
+
+### Orange Pi performance note
+
+Current Orange Pi playback is still limited by Godot falling back to Mesa `llvmpipe` software rendering instead of an accelerated GL path. The RTSP sidecar tuning knobs above are a mitigation to keep hardware validation moving, not the final performance fix.
+
+- Pi production defaults currently ship as `960x540 @ 30fps`
+- Issue `#17` tracks getting the viewer off `llvmpipe`
+- Issue `#16` tracks an in-app head-tracker drift calibration workflow
 
 **Ideal camera setup** (Raspberry Pi + `gst-rtsp-server`):
 
@@ -297,13 +311,14 @@ the sidecar is listening on port 9001.
 | Local file video source (.ogv via VideoStreamPlayer) | Done |
 | RTSP/GStreamer video source (H.264 over RTSP) | Done |
 | GStreamer sidecar file mode (any format via decodebin) | Done |
+| RTSP latest-frame drop + sidecar tuning controls | Done |
 | UDP control output + gamepad input | Done |
 | Telemetry input + HUD panels | Done |
 | Status overlay (Connecting… / No signal) | Done |
 | Linux ARM64 export + deploy toolchain | Done |
 | XRLinuxDriver auto-start (systemd) | Done |
 | Full hardware stack on Pi + XREAL Air 2 Pro | Done — verified 2026-05-24 |
-| End-to-end FPV session (issue #9) | Needs RC vehicle + Pi camera connected |
+| End-to-end FPV session (issue #9) | In progress — live RTSP video confirmed on XREAL; blocked by llvmpipe performance and drift follow-ups |
 | OpenXR tracker for Meta Quest | Parked (future) |
 
 ### Vehicle node roadmap

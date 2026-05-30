@@ -146,6 +146,7 @@ rtspsrc location="<URL>" latency=0 protocols=tcp
 | Recenter + sensitivity | Done |
 | Local file video source | Done |
 | RTSP/GStreamer video source | Done |
+| RTSP latest-frame drop + sidecar tuning | Done |
 | UDP control output + gamepad | Done |
 | Telemetry input + HUD | Done |
 | TelemetryPanelLayout config resource | Done |
@@ -153,9 +154,9 @@ rtspsrc location="<URL>" latency=0 protocols=tcp
 | Linux ARM64 export + deploy | Done |
 | XRLinuxDriver systemd service | Done |
 | GStreamer on Orange Pi | Done — `gstreamer1.0-libav` installed; pipeline verified |
-| GUT test framework | Done — v9.6.0, 47/47 tests passing |
+| GUT test framework | Done — v9.6.0, 49/49 tests passing |
 | Full hardware stack verified (#6) | Done — fullscreen on XREAL, head tracking live, video on hemisphere confirmed 2026-05-24 |
-| End-to-end FPV session (#9) | Needs RC vehicle + Pi camera physically connected |
+| End-to-end FPV session (#9) | In progress — live RTSP video confirmed on XREAL; performance blocked by llvmpipe and drift follow-ups |
 | OpenXR tracker (Meta Quest) | Parked — future work |
 
 ### Remaining hardware-only steps (issue #9)
@@ -168,13 +169,13 @@ Vehicle-side Raspberry Pi work is now tracked in-repo, but it is still a separat
 - Issues: `#10` through `#14`
 - Important: the viewer now emits the same fixed-length 8-channel RC packet as the vehicle node. The migration boundary is that the viewer still owns semantic input mixing (`throttle/steering/head pose`) before serializing RC channels.
 
-Issue #6 is fully closed. The remaining work requires RC vehicle + camera:
+Issue #6 is fully closed. Issue #9 has now progressed to live RTSP-on-headset validation, but two follow-ups remain before the session is acceptable for field use:
 
-1. Connect Pi camera to RC vehicle
-2. Start RTSP stream from camera
-3. Run `launch.sh` and verify live RTSP feed on hemisphere with head tracking
+1. Fix Orange Pi rendering so Godot does not run on Mesa `llvmpipe` (`#17`)
+2. Add an in-app head-tracker drift calibration workflow (`#16`)
+3. Re-run the full RC vehicle + camera session after those fixes
 
-**ARM64 rendering note**: Vulkan is unavailable on RK3588 via X11 (VK_KHR_surface missing). Godot falls back to OpenGL 3 automatically. libGL rockchip/rknpu DRI errors appear in the log but rendering works correctly.
+**ARM64 rendering note**: Vulkan is unavailable on RK3588 via X11 (VK_KHR_surface missing), so Godot falls back to OpenGL 3. During the 2026-05-30 hardware session, `glxinfo -B` reported `llvmpipe`, and the viewer stayed CPU-bound at roughly 370-530% CPU. The RTSP sidecar now supports width/height/fps throttling as a mitigation, but issue `#17` tracks the real fix: getting the Pi off software rendering.
 
 **XRLinuxDriver**: Systemd service shows restart-loop errors only because the already-running daemon (PID stable since boot) prevents a second instance — the first instance is fine. OpenTrack UDP target is `127.0.0.1:4242`.
 
